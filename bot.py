@@ -25,7 +25,11 @@ def initialize_db():
     conn = sqlite3.connect('team.db')
     c = conn.cursor()
 
-    c.execute(''' DROP TABLE users''')
+    try:
+        c.execute(''' DROP TABLE users''')
+    except sqlite3.OperationalError:
+        # The table doesn't exist, which is okay.
+        pass
     c.execute('''CREATE TABLE users (id TEXT, realName TEXT, currentLate REAL, lastWeek REAL, active INTEGER)''')
 
     count = 0
@@ -95,6 +99,13 @@ def handle_command(command):
         startTime = datetime.datetime(today.year, today.month, today.day, hour=timeToBegin)
         difference = datetime.datetime.fromtimestamp(float(command['ts'])) - startTime
         print(difference.total_seconds())
+
+        slack_client.api_call("reactions.add", channel=command['channel'], 
+                name='thumbsup', timestamp=command['ts'])
+
+        if difference.total_seconds() < 0:
+            # You weren't late, so there's no need to update the table.
+            return
 
         currentLate = c.execute('''SELECT currentLate FROM users WHERE id=?''', (command['user'],))
         c.execute('''UPDATE users SET currentLate=? WHERE id=?''', (currentLate.fetchone()[0] + difference.total_seconds(), command['user']))
@@ -197,6 +208,7 @@ def parse_slack_output(slack_rtm_output):
     """
     output_list = slack_rtm_output
     if output_list:
+        print(datetime.datetime.now(), end='')
         print(output_list)
     if output_list and len(output_list) > 0:
         for output in output_list:
@@ -214,7 +226,15 @@ if __name__ == "__main__":
         print("TimeBot connected and running!")
         try:
             while True:
-                command = parse_slack_output(slack_client.rtm_read())
+                try:
+                    command = parse_slack_output(slack_client.rtm_read())
+                except TimeoutError:
+                    if slack_client.rtm_connect():
+                        continue
+                    else:
+                        print(str(datetime.datetime.now()) + "Slack client failed to reconnect")
+                        conn.close()
+                        break
                 if command:
                     handle_command(command)
                 if not command:
