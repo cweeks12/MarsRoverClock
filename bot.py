@@ -30,7 +30,7 @@ def initialize_db():
     except sqlite3.OperationalError:
         # The table doesn't exist, which is okay.
         pass
-    c.execute('''CREATE TABLE users (id TEXT, realName TEXT, currentLate REAL, lastWeek REAL, active INTEGER)''')
+    c.execute('''CREATE TABLE users (id TEXT, realName TEXT, currentLate REAL, checkInDate INTEGER, active INTEGER)''')
 
     count = 0
     if slack_client.rtm_connect():
@@ -41,7 +41,7 @@ def initialize_db():
                     count += 1
                     print( user['id'])
                     print( user['name'])
-                    c.execute('INSERT INTO users VALUES (?, ?, 0.0, 0.0, 0)', (user['id'], user['name']))
+                    c.execute('INSERT INTO users VALUES (?, ?, 0.0, 0, 0)', (user['id'], user['name']))
 
             print( "Found " + str(count) + " users and added them to database.")
         else:
@@ -53,7 +53,7 @@ def initialize_db():
 
     print("User Table:")
     for row in c.execute('''SELECT * FROM users'''):
-        print( row)
+        print(row)
 
     conn.close()
 
@@ -93,25 +93,29 @@ def handle_command(command):
         else:
             slack_client.api_call("chat.postMessage", channel=command['channel'], 
                     text="Why are you coming in on the weekend???", as_user = True)
-            return
+            timeToBegin = 8
 
 
         startTime = datetime.datetime(today.year, today.month, today.day, hour=timeToBegin)
         difference = datetime.datetime.fromtimestamp(float(command['ts'])) - startTime
-        print(difference.total_seconds())
-
-        slack_client.api_call("reactions.add", channel=command['channel'], 
-                name='thumbsup', timestamp=command['ts'])
 
         if difference.total_seconds() < 0:
             # You weren't late, so there's no need to update the table.
-            return
+            delta = 0
+        else:
+            delta = difference.total_seconds()
 
-        currentLate = c.execute('''SELECT currentLate FROM users WHERE id=?''', (command['user'],))
-        c.execute('''UPDATE users SET currentLate=? WHERE id=?''', (currentLate.fetchone()[0] + difference.total_seconds(), command['user']))
+        currentLate = c.execute('''SELECT currentLate, checkInDate FROM users WHERE id=?''', (command['user'],))
+        row = currentLate.fetchone()
+        if row[1] != datetime.date.today().toordinal():
+            c.execute('''UPDATE users SET currentLate=?, checkInDate=? WHERE id=?''', (row[0] + delta, datetime.date.today().toordinal(), command['user']))
 
-        slack_client.api_call("reactions.add", channel=command['channel'], 
+            slack_client.api_call("reactions.add", channel=command['channel'], 
                 name='thumbsup', timestamp=command['ts'])
+        else:
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You already clocked in today!", as_user=True)
+
 
     elif command['text'].startswith('!standings'):
         # Show current standings
@@ -119,7 +123,7 @@ def handle_command(command):
         origText = text
         for user in c.execute('''SELECT realName, currentLate FROM users WHERE active=1 ORDER BY currentLate DESC LIMIT 5'''):
             if user[1] > 0:
-                text += "*"+user[0]+"*: " + str(user[1]) + " minutes late\n"
+                text += "*"+user[0]+"*: " + toTime(user[1]) + " late\n"
 
         if text == origText:
             text = "Nobody has been late this week. At least not _yet_"
@@ -129,26 +133,12 @@ def handle_command(command):
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text, linkNames=False)
 
-    elif command['text'].startswith('!final'): # And it's a specific user
-        # Reports the standings for the week, and resets the current values
-        # Moves the current values to the last week column
-        
-        pass
+    elif command['text'].startswith('!!reset') and command['channel'][0] == 'D':
+        # Resets the time for the week
+        c.execute('''UPDATE users SET currentLate=0.0, checkInDate=0''')
+        slack_client.api_call("chat.postMessage", channel=command['channel'], 
+                text="Standings reset!", as_user=True)
 
-    elif command['text'].startswith('!lastweek'): 
-        # Reports the standings for last week
-        text = "*Here are the 5 latest people from last week:*\n"
-        origText = text
-        for user in c.execute('''SELECT realName, lastWeek FROM users WHERE active=1 ORDER BY lastWeek DESC LIMIT 5'''):
-            text += "*" + user[0]+"*: " + toTime(user[1]) + " late\n"
-
-        if text == origText:
-            text = "Nobody has been late this week. At least not _yet_"
-        else:
-            text+= "Better luck next time!"
-
-        slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
-                text=text, linkNames=False)
 
     elif command['text'].startswith('!active') and command['channel'][0] == 'D':
         # Users mark themselves active
@@ -175,6 +165,14 @@ def handle_command(command):
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
 
+    elif command['text'].startswith('!whoshere'):
+        rows = c.execute('''SELECT * FROM users WHERE checkInDate=? AND active=1''', (datetime.date.today().toordinal(),)).fetchall()
+        attendance = len(rows)
+        quantifier = "people have" if attendance != 1 else "person has"
+        text = str(attendance) + " " + quantifier + " clocked in so far today."
+        slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
+                text=text)
+
     else:
         # Unknown command, print usage statement
 
@@ -183,16 +181,14 @@ def handle_command(command):
             text="I don't understand " + command['text'] + ". Try one of these\n"\
                 + "*!in*: Clock in\n"\
                 + "*!standings*: View current standings for the week\n"\
-                + "*!final*: Show final standings\n"\
-                + "*!lastweek*: Show standings from last week\n"\
                 + "*!active*: Mark yourself active\n"\
-                + "*!status*: See your current late time this week"
+                + "*!status*: See your current late time this week\n"\
+                + "*!whoshere*: See current number of people checked in for today"
             # If it's in a regular channel
         else:
-            text="I don't understand " + command['text'] + ". Try one of these\n"\
+            text="I don't understand " + command['text'] + ". I can only do this in public channels:\n"\
                 + "*!standings*: View current standings for the week\n"\
-                + "*!final*: Make current standings final\n"\
-                + "*!lastweek*: Show standings from last week\n"
+                + "*!whoshere*: See current number of people checked in for today"
 
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
