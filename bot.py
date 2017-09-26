@@ -6,7 +6,7 @@ import sqlite3
 import time
 from slackclient import SlackClient
 
-# This code is taken from https://www.fullstackpython.com/blog/build-first-slack-bot-python.html
+# This code is inspired by https://www.fullstackpython.com/blog/build-first-slack-bot-python.html
 # Visit that webpage to get the whole setup guide
 
 # timebot's ID as an environment variable
