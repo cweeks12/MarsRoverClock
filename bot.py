@@ -172,6 +172,15 @@ def handle_command(command):
         text = str(attendance) + " " + quantifier + " clocked in so far today."
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
+    elif command['text'].startswith('!sumtime'):
+        rows = c.execute('''SELECT currentLate FROM users WHERE active=1''')
+        totalTime = 0.0
+        for row in rows:
+            totalTime += row[0]
+
+        slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
+                text="The total time that we've been late this week is " + toTime(totalTime) + ".")
+
 
     else:
         # Unknown command, print usage statement
@@ -183,12 +192,14 @@ def handle_command(command):
                 + "*!standings*: View current standings for the week\n"\
                 + "*!active*: Mark yourself active\n"\
                 + "*!status*: See your current late time this week\n"\
-                + "*!whoshere*: See current number of people checked in for today"
+                + "*!whoshere*: See current number of people checked in for today\n"\
+                + "*!sumtime*: See the cumulative time that people have been late this week"
             # If it's in a regular channel
         else:
             text="I don't understand " + command['text'] + ". I can only do this in public channels:\n"\
                 + "*!standings*: View current standings for the week\n"\
-                + "*!whoshere*: See current number of people checked in for today"
+                + "*!whoshere*: See current number of people checked in for today\n"\
+                + "*!sumtime*: See the cumulative time that people have been late this week"
 
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
