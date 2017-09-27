@@ -79,7 +79,7 @@ def handle_command(command):
     are valid commands. If so, then acts on the commands. If not,
     returns back what it needs for clarification.
     """
-    if command['text'].startswith('!in') and command['channel'][0] == 'D':
+    if command['text'].startswith('!in') and not command['text'].startswith('!intime') and command['channel'][0] == 'D':
 
         today = datetime.date.today()
 
@@ -181,30 +181,79 @@ def handle_command(command):
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text="The total time that we've been late this week is " + toTime(totalTime) + ".")
 
+    elif command['text'].startswith('!intime'):
+        today = datetime.date.today()
+
+        try:
+            minutesLate = int(command['text'].split(' ')[1])
+        except:
+            slack_client.api_call("chat.postMessage", channel=command['channel'], 
+                    text="Invalid usage. Put the number of minutes late after *!intime*.", as_user = True)
+            return
+
+        secondsLate = minutesLate * 60
+        
+        if secondsLate < 0:
+            # You weren't late, so there's no need to update the table.
+            secondsLate = 0
+
+        currentLate = c.execute('''SELECT currentLate, checkInDate FROM users WHERE id=?''', (command['user'],))
+        row = currentLate.fetchone()
+        if row[1] != datetime.date.today().toordinal():
+            c.execute('''UPDATE users SET currentLate=?, checkInDate=? WHERE id=?''', (row[0] + secondsLate, datetime.date.today().toordinal(), command['user']))
+
+            slack_client.api_call("reactions.add", channel=command['channel'], 
+                name='thumbsup', timestamp=command['ts'])
+        else:
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You already clocked in today!", as_user=True)
+
+
+    elif command['text'].startswith('!usage'):
+        # If it's a direct message
+        if command['channel'][0] == 'D':
+            text=privateUsage()
+            
+        # If it's in a regular channel
+        else:
+            text=publicUsage()
+
+        slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
+                text=text)
 
     else:
         # Unknown command, print usage statement
 
         # If it's a direct message
         if command['channel'][0] == 'D':
-            text="I don't understand " + command['text'] + ". Try one of these\n"\
-                + "*!in*: Clock in\n"\
-                + "*!standings*: View current standings for the week\n"\
-                + "*!active*: Mark yourself active\n"\
-                + "*!status*: See your current late time this week\n"\
-                + "*!whoshere*: See current number of people checked in for today\n"\
-                + "*!sumtime*: See the cumulative time that people have been late this week"
-            # If it's in a regular channel
+            text="I don't understand " + command['text'] + ". " + privateUsage()
+            
+        # If it's in a regular channel
         else:
-            text="I don't understand " + command['text'] + ". I can only do this in public channels:\n"\
-                + "*!standings*: View current standings for the week\n"\
-                + "*!whoshere*: See current number of people checked in for today\n"\
-                + "*!sumtime*: See the cumulative time that people have been late this week"
+            text="I don't understand " + command['text'] + ". " + publicUsage()
 
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
 
     conn.commit()
+
+def publicUsage(text, channel):
+       return "I can only do this in public channels:\n"\
+                + "*!standings*: View current standings for the week\n"\
+                + "*!whoshere*: See current number of people checked in for today\n"\
+                + "*!sumtime*: See the cumulative time that people have been late this week"
+
+def privateUsage():
+    return "Try one of these:\n"\
+                + "*!in*: Clock in\n"\
+                + "*!intime number*: Clock in being _number_ minutes late. (For when you forget to clock in). Ex: !intime 5\n"\
+                + "*!standings*: View current standings for the week\n"\
+                + "*!active*: Mark yourself active\n"\
+                + "*!status*: See your current late time this week\n"\
+                + "*!whoshere*: See current number of people checked in for today\n"\
+                + "*!sumtime*: See the cumulative time that people have been late this week"
+
+
 
 
 def parse_slack_output(slack_rtm_output):
