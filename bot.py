@@ -80,6 +80,11 @@ def handle_command(command):
     returns back what it needs for clarification.
     """
     if command['text'].startswith('!in') and not command['text'].startswith('!intime') and command['channel'][0] == 'D':
+        if any(char.isdigit() for char in command['text']):
+            slack_client.api_call("chat.postMessage", channel=command['channel'], 
+                    text="I noticed you included a number in your message. Did you mean to do *!intime*?", as_user = True) 
+            return
+            
 
         today = datetime.date.today()
 
@@ -237,7 +242,7 @@ def handle_command(command):
 
     conn.commit()
 
-def publicUsage(text, channel):
+def publicUsage():
        return "I can only do this in public channels:\n"\
                 + "*!standings*: View current standings for the week\n"\
                 + "*!whoshere*: See current number of people checked in for today\n"\
