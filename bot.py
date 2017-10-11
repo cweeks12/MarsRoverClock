@@ -177,6 +177,7 @@ def handle_command(command):
         text = str(attendance) + " " + quantifier + " clocked in so far today."
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
+
     elif command['text'].startswith('!sumtime'):
         rows = c.execute('''SELECT currentLate FROM users WHERE active=1''')
         totalTime = 0.0
@@ -212,6 +213,17 @@ def handle_command(command):
         else:
             slack_client.api_call("chat.postMessage", channel=command['channel'],
                     text="You already clocked in today!", as_user=True)
+
+    elif command['text'].startswith('!attendance'):
+        # Return the list of people that aren't here
+        message = "These people haven't clocked in yet today:\n"
+        rows = c.execute('''SELECT realName FROM users WHERE checkInDate != ? AND active = 1''', (datetime.date.today().toordinal(),))
+
+        for row in rows:
+            message += "*" + row[0] + "*\n"
+
+        slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
+                text=message)
 
 
     elif command['text'].startswith('!usage'):
