@@ -112,6 +112,12 @@ def handle_command(command):
 
         currentLate = c.execute('''SELECT currentLate, checkInDate FROM users WHERE id=?''', (command['user'],))
         row = currentLate.fetchone()
+        
+        if not row:
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You are not in the database. Talk to an administrator.", as_user=True)
+            return
+        
         if row[1] != datetime.date.today().toordinal():
             c.execute('''UPDATE users SET currentLate=?, checkInDate=? WHERE id=?''', (row[0] + delta, datetime.date.today().toordinal(), command['user']))
 
@@ -147,14 +153,21 @@ def handle_command(command):
 
     elif command['text'].startswith('!active') and command['channel'][0] == 'D':
         # Users mark themselves active
-        c.execute('''UPDATE users SET active=1 WHERE id=?''', (command['user'],))
+        if not c.execute('''UPDATE users SET active=1 WHERE id=?''', (command['user'],)) :
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You are not in the database. Talk to an administrator.", as_user=True)
+            return
+        
         slack_client.api_call("reactions.add", channel=command['channel'], 
                 name='white_check_mark', timestamp=command['ts'])
         print( command['user'] + " marked themselves active")
 
     elif command['text'].startswith('!inactive') and command['channel'][0] == 'D':
         # Users mark themselves inactive
-        c.execute('''UPDATE users SET active=0 WHERE id=?''', (command['user'],))
+        if not c.execute('''UPDATE users SET active=0 WHERE id=?''', (command['user'],)) :
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You are not in the database. Talk to an administrator.", as_user=True)
+            return
         slack_client.api_call("reactions.add", channel=command['channel'], 
                 name='white_check_mark', timestamp=command['ts'])
         print( command['user'] + " marked themselves inactive")
@@ -162,6 +175,10 @@ def handle_command(command):
     elif command['text'].startswith('!status') and command['channel'][0] == 'D':
         # Prints out their current late time
         response = c.execute('''SELECT id, currentLate FROM users WHERE id=?''', (command['user'],)).fetchone()
+        if not response:
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You are not in the database. Talk to an administrator.", as_user=True)
+            return
 
         if response[1] > 0:
             text = "You have been " + toTime(response[1]) + " late this week."
@@ -172,6 +189,11 @@ def handle_command(command):
 
     elif command['text'].startswith('!whoshere'):
         rows = c.execute('''SELECT * FROM users WHERE checkInDate=? AND active=1''', (datetime.date.today().toordinal(),)).fetchall()
+        if not rows:
+            slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
+                text="Nobody is here yet")
+            return
+           
         attendance = len(rows)
         quantifier = "people have" if attendance != 1 else "person has"
         text = str(attendance) + " " + quantifier + " clocked in so far today."
@@ -205,6 +227,10 @@ def handle_command(command):
 
         currentLate = c.execute('''SELECT currentLate, checkInDate FROM users WHERE id=?''', (command['user'],))
         row = currentLate.fetchone()
+        if not row:
+            slack_client.api_call("chat.postMessage", channel=command['channel'],
+                    text="You are not in the database. Talk to an administrator.", as_user=True)
+            return
         if row[1] != datetime.date.today().toordinal():
             c.execute('''UPDATE users SET currentLate=?, checkInDate=? WHERE id=?''', (row[0] + secondsLate, datetime.date.today().toordinal(), command['user']))
 
@@ -217,10 +243,11 @@ def handle_command(command):
     elif command['text'].startswith('!attendance'):
         # Return the list of people that aren't here
         message = "These people haven't clocked in yet today:\n"
-        rows = c.execute('''SELECT realName FROM users WHERE checkInDate != ? AND active = 1''', (datetime.date.today().toordinal(),))
+        rows = c.execute('''SELECT realName, checkInDate FROM users WHERE checkInDate != ? AND active = 1 ORDER BY checkInDate DESC''', (datetime.date.today().toordinal(),))
 
         for row in rows:
-            message += "*" + row[0] + "*\n"
+            message += "*" + row[0] + "*: " + str(datetime.date.today().toordinal() - row[1])
+            message += " day ago\n" if datetime.date.today().toordinal() - row[1] == 1 else " days ago\n"
 
         slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=message)
@@ -258,7 +285,9 @@ def publicUsage():
        return "I can only do this in public channels:\n"\
                 + "*!standings*: View current standings for the week\n"\
                 + "*!whoshere*: See current number of people checked in for today\n"\
-                + "*!sumtime*: See the cumulative time that people have been late this week"
+                + "*!sumtime*: See the cumulative time that people have been late this week\n"\
+                + "*!attendance*: See who hasn't clocked in yet today\n"\
+                + "*!usage*: This usage statement"
 
 def privateUsage():
     return "Try one of these:\n"\
@@ -267,8 +296,9 @@ def privateUsage():
                 + "*!standings*: View current standings for the week\n"\
                 + "*!active*: Mark yourself active\n"\
                 + "*!status*: See your current late time this week\n"\
-                + "*!whoshere*: See current number of people checked in for today\n"\
-                + "*!sumtime*: See the cumulative time that people have been late this week"
+                + "*!sumtime*: See the cumulative time that people have been late this week\n"\
+                + "*!attendance*: See who hasn't clocked in yet today\n"\
+                + "*!usage*: This usage statement"
 
 
 
