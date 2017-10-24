@@ -146,7 +146,7 @@ def handle_command(command):
 
     elif command['text'].startswith('!!reset') and command['channel'][0] == 'D':
         # Resets the time for the week
-        c.execute('''UPDATE users SET currentLate=0.0, checkInDate=0''')
+        c.execute('''UPDATE users SET currentLate=0.0''')
         slack_client.api_call("chat.postMessage", channel=command['channel'], 
                 text="Standings reset!", as_user=True)
 
