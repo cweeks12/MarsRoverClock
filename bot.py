@@ -331,7 +331,7 @@ if __name__ == "__main__":
             while True:
                 try:
                     command = parse_slack_output(slack_client.rtm_read())
-                except TimeoutError:
+                except (TimeoutError, websocket._exceptions.WebSocketConnectionClosedException):
                     if slack_client.rtm_connect():
                         continue
                     else:
