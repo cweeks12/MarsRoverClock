@@ -4,6 +4,7 @@ import datetime
 import os
 import sqlite3
 import time
+import websocket
 from slackclient import SlackClient
 
 # This code is inspired by https://www.fullstackpython.com/blog/build-first-slack-bot-python.html
