@@ -149,6 +149,8 @@ def handle_command(command):
         c.execute('''UPDATE users SET currentLate=0.0''')
         slack_client.api_call("chat.postMessage", channel=command['channel'], 
                 text="Standings reset!", as_user=True)
+        with open('reset.log', 'a+') as f:
+            f.write(str(datetime.datetime.now()) + ':' + command['user'] + ' reset timebot.\n')
 
 
     elif command['text'].startswith('!active') and command['channel'][0] == 'D':
@@ -331,7 +333,9 @@ if __name__ == "__main__":
             while True:
                 try:
                     command = parse_slack_output(slack_client.rtm_read())
-                except (TimeoutError, websocket._exceptions.WebSocketConnectionClosedException):
+                except (TimeoutError, websocket._exceptions.WebSocketConnectionClosedException) as e:
+                    with open('crash.log', 'a+') as f:
+                        f.write(str(datetime.datetime.now()) + ': ' + str(type(e)) + e + '\n')
                     if slack_client.rtm_connect():
                         continue
                     else:
