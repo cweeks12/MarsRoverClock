@@ -336,7 +336,7 @@ if __name__ == "__main__":
                     command = parse_slack_output(slack_client.rtm_read())
                 except (TimeoutError, websocket._exceptions.WebSocketConnectionClosedException) as e:
                     with open('crash.log', 'a+') as f:
-                        f.write(str(datetime.datetime.now()) + ': ' + str(type(e)) + e + '\n')
+                        f.write(str(datetime.datetime.now()) + ': ' + str(type(e)) + ' - ' + str(e) + '\n')
                     if slack_client.rtm_connect():
                         continue
                     else:
