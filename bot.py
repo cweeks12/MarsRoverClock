@@ -377,7 +377,7 @@ def add_user(command):
 
     if row:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
-                text="You are already in the database, try *!active*.", as_user=True)
+                text="You are already in the database, if you're having issues, try *!active*.", as_user=True)
     else:
         c.execute('INSERT INTO users VALUES (?, ?, 0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0)', (user['id'], user['name']))
         slack_client.api_call("reactions.add", channel=command['channel'], 
