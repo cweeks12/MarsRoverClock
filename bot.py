@@ -127,6 +127,9 @@ def handle_command(command):
 
     elif command['text'].startswith('!out') and command['channel'][0] == 'D':
         clock_out(command)
+
+    elif command['text'].startswith('!addme') and command['channel'][0] == 'D':
+        add_user(command)
     
     elif command['text'].startswith('!lateweek'):
         rows = c.execute('''SELECT timeLateThisWeek FROM users WHERE active=1''')
@@ -367,6 +370,19 @@ def out_late(command):
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are already clocked out!", as_user=True)
+
+def add_user(command):
+    currentRow = c.execute('''SELECT * FROM users WHERE id=?''', (command['user'],))
+    row = currentRow.fetchone()
+
+    if row:
+        slack_client.api_call("chat.postMessage", channel=command['channel'],
+                text="You are already in the database, try *!active*.", as_user=True)
+    else:
+        c.execute('INSERT INTO users VALUES (?, ?, 0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0)', (user['id'], user['name']))
+        slack_client.api_call("reactions.add", channel=command['channel'], 
+            name='thumbsup', timestamp=command['ts'])
+
 
 def get_standings(command):
     # Show current standings
