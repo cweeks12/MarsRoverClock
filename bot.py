@@ -382,7 +382,7 @@ def add_user(command):
         users = slack_client.api_call("users.list")
         for user in users['members']:
             if user['id'] == command['user']:
-                c.execute('INSERT INTO users VALUES (?, ?, 0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0)', (command['id'], user['name']))
+                c.execute('INSERT INTO users VALUES (?, ?, 0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0)', (command['user'], user['name']))
                 break
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
