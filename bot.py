@@ -314,7 +314,7 @@ def in_late(command):
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
 
-        print(str(datetime.datetime.now()) + ": " + str(row[3]) + ' clocked in late')
+        print(str(datetime.datetime.now()) + ": " + str(row[3]) + ' clocked in with !intime')
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You already clocked in today!", as_user=True)
@@ -376,7 +376,7 @@ def out_late(command):
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
 
-        print(str(datetime.datetime.now()) + ": " + str(row[4]) + ' clocked out late')
+        print(str(datetime.datetime.now()) + ": " + str(row[4]) + ' clocked out with !outtime')
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are already clocked out!", as_user=True)
