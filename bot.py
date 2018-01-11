@@ -254,7 +254,7 @@ def clock_in(command):
     else:
         delta = difference.total_seconds()
 
-    timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn, timeClockedInAt FROM users WHERE id=? AND active=1''', (command['user'],))
+    timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn, timeClockedInAt, realName FROM users WHERE id=? AND active=1''', (command['user'],))
     row = timeLateThisWeek.fetchone()
     
     if not row:
@@ -272,6 +272,7 @@ def clock_in(command):
 
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
+        print(str(datetime.datetime.now()) + ": " + str(row[4]) + ' clocked in')
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are already clocked in!", as_user=True)
@@ -293,7 +294,7 @@ def in_late(command):
         # You weren't late, so there's no need to update the table.
         secondsLate = 0
 
-    timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn FROM users WHERE id=? AND active=1''', (command['user'],))
+    timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn, realName FROM users WHERE id=? AND active=1''', (command['user'],))
     row = timeLateThisWeek.fetchone()
 
     if not row:
@@ -312,6 +313,8 @@ def in_late(command):
 
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
+
+        print(str(datetime.datetime.now()) + ": " + str(row[3]) + ' clocked in late')
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You already clocked in today!", as_user=True)
@@ -322,7 +325,7 @@ def clock_out(command):
                 text="I noticed you included a number in your message. Did you mean to do *!outtime*?", as_user = True) 
         return
 
-    currentRow = c.execute('''SELECT timeSpentThisWeek, totalTimeSpent, clockedIn, timeClockedInAt FROM users WHERE id=? AND active=1''', (command['user'],))
+    currentRow = c.execute('''SELECT timeSpentThisWeek, totalTimeSpent, clockedIn, timeClockedInAt, realName FROM users WHERE id=? AND active=1''', (command['user'],))
     row = currentRow.fetchone()
     
     if not row:
@@ -340,6 +343,7 @@ def clock_out(command):
 
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
+        print(str(datetime.datetime.now()) + ": " + str(row[4]) + ' clocked out')
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are already clocked out!", as_user=True)
@@ -353,7 +357,7 @@ def out_late(command):
                 text="Invalid usage. Put the number of hours spent after *!outtime*.", as_user = True)
         return
 
-    currentRow = c.execute('''SELECT timeSpentThisWeek, totalTimeSpent, clockedIn, timeClockedInAt FROM users WHERE id=? AND active=1''', (command['user'],))
+    currentRow = c.execute('''SELECT timeSpentThisWeek, totalTimeSpent, clockedIn, timeClockedInAt, realName FROM users WHERE id=? AND active=1''', (command['user'],))
     row = currentRow.fetchone()
     
     if not row:
@@ -371,6 +375,8 @@ def out_late(command):
 
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
+
+        print(str(datetime.datetime.now()) + ": " + str(row[4]) + ' clocked out late')
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are already clocked out!", as_user=True)
@@ -507,6 +513,7 @@ if __name__ == "__main__":
                         f.write(str(datetime.datetime.now()) + ': ' + str(type(e)) + '\n')
                     # Then we reconnect
                     if slack_client.rtm_connect():
+                        print(str(datetime.datetime.now()) + ": RECOVERED FROM A CRASH")
                         continue
                     else:
                         print(str(datetime.datetime.now()) + "Slack client failed to reconnect")
