@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import csv
 import datetime
 import os
 import sqlite3
@@ -101,9 +102,6 @@ def handle_command(command):
     elif command['text'].startswith('!in') and command['channel'][0] == 'D':
         clock_in(command)
 
-    # Show current standings. Latest and time spent
-    elif command['text'].startswith('!standings'):
-        get_standings(command)
 
     # Reset the week
     elif command['text'].startswith('!!reset') and command['channel'][0] == 'D':
@@ -130,6 +128,10 @@ def handle_command(command):
 
     elif command['text'].startswith('!addme') and command['channel'][0] == 'D':
         add_user(command)
+
+    # Show current standings. Latest and time spent
+    elif command['text'].startswith('!standings'):
+        get_standings(command)
     
     elif command['text'].startswith('!lateweek'):
         rows = c.execute('''SELECT timeLateThisWeek FROM users WHERE active=1''')
@@ -212,23 +214,26 @@ def handle_command(command):
     conn.commit()
 
 def publicUsage():
-       return "I can only do this in public channels:\n"\
-                + "*!standings*: View current standings for the week\n"\
-                + "*!whoshere*: See current number of people checked in for today\n"\
-                + "*!sumtime*: See the cumulative time that people have been late this week\n"\
-                + "*!attendance*: See who hasn't clocked in yet today\n"\
-                + "*!usage*: This usage statement"
+       return ("I can only do this in public channels:\n"
+                + "*!standings*: View current standings for the week\n"
+                + "*!attendance*: See who hasn't clocked in today\n"
+                + "*!workweek*: See the cumulative time that people have worked this week\n"
+                + "*!worksemester*: See the cumulative time that people have worked this semester\n"
+                + "*!lateweek*: See the cumulative time that people have been late this week\n"
+                + "*!latesemester*: See the cumulative time that people have been late this semester\n"
+                + "*!usage*: This usage statement")
 
 def privateUsage():
-    return "Try one of these:\n"\
-                + "*!in*: Clock in\n"\
-                + "*!intime number*: Clock in being _number_ minutes late. (For when you forget to clock in). Ex: !intime 5\n"\
-                + "*!standings*: View current standings for the week\n"\
-                + "*!active*: Mark yourself active\n"\
-                + "*!status*: See your current late time this week\n"\
-                + "*!sumtime*: See the cumulative time that people have been late this week\n"\
-                + "*!attendance*: See who hasn't clocked in yet today\n"\
-                + "*!usage*: This usage statement"
+    return ("Try one of these:\n"
+                + "*!in*: Clock in\n"
+                + "*!intime number*: Clock in being _number_ minutes late. (For when you forget to clock in). Ex: !intime 5\n"
+                + "*!out*: Clock out\n"
+                + "*!outtime number*: Clock out having worked _number_ hours. Ex: !outtime 2 (worked 2 hours)\n"
+                + "*!active*: Mark yourself active\n"
+                + "*!status*: See your current late time this week\n"
+                + "*!sumtime*: See the cumulative time that people have been late this week\n"
+                + "*!attendance*: See who hasn't clocked in yet today\n"
+                + "*!usage*: This usage statement")
 
 def clock_in(command):
     if any(char.isdigit() for char in command['text']):
@@ -241,6 +246,7 @@ def clock_in(command):
 
     today = datetime.datetime.today()
 
+    # There's an issue here, but I don't know what it is.
     startTime = datetime.datetime(today.year, today.month, today.day, hour=timeToBegin)
     difference = datetime.datetime.fromtimestamp(float(command['ts'])) - startTime
 
@@ -386,7 +392,7 @@ def add_user(command):
                 break
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
-
+        active(command)
 
 def get_standings(command):
     # Show current standings
@@ -436,16 +442,21 @@ def inactive(command):
 
 def status(command):
     # Prints out their current late time
-    response = c.execute('''SELECT id, timeLateThisWeek FROM users WHERE id=?''', (command['user'],)).fetchone()
+    response = c.execute('''SELECT id, timeLateThisWeek, timeSpentThisWeek FROM users WHERE id=?''', (command['user'],)).fetchone()
     if not response:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are not in the database. Talk to an administrator.", as_user=True)
         return
 
     if response[1] > 0:
-        text = "You have been " + toTime(response[1]) + " late this week."
+        text = "You have been " + toTime(response[1]) + " late this week. "
     else:
         text = "You have not been late yet this week."
+
+    if response[2] > 0:
+        text += "You have worked for " + toTime(response[2]) + " this week. "
+    else:
+        text += "You have not done any work yet this week. "
     slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
                 text=text)
 
