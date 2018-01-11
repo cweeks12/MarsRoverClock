@@ -94,19 +94,17 @@ def handle_command(command):
     returns back what it needs for clarification.
     """
 
-    # Clock in
     # Clocks in late
     if command['text'].startswith('!intime') and command['channel'][0] == 'D':
         in_late(command)
 
+    # Clock in
     elif command['text'].startswith('!in') and command['channel'][0] == 'D':
         clock_in(command)
-
 
     # Reset the week
     elif command['text'].startswith('!!reset') and command['channel'][0] == 'D':
         reset(command)
-
 
     # Mark as active
     elif command['text'].startswith('!active') and command['channel'][0] == 'D':
@@ -248,7 +246,7 @@ def clock_in(command):
 
     # There's an issue here, but I don't know what it is.
     startTime = datetime.datetime(today.year, today.month, today.day, hour=timeToBegin)
-    difference = datetime.datetime.fromtimestamp(float(command['ts'])) - startTime
+    difference = datetime.datetime.now() - startTime
 
     if difference.total_seconds() < 0:
         # You weren't late, so there's no need to update the table.
@@ -392,6 +390,7 @@ def add_user(command):
                 break
         slack_client.api_call("reactions.add", channel=command['channel'], 
             name='thumbsup', timestamp=command['ts'])
+        # Mark them active automatically
         active(command)
 
 def get_standings(command):
@@ -411,6 +410,13 @@ def get_standings(command):
             text=text, linkNames=False)
 
 def reset(command):
+    rows = c.execute('''SELECT realName, timeLateThisWeek, timeSpentThisWeek FROM users WHERE active=1''')
+    # Write the current status to a csv
+    with open(str(datetime.date.today) + '-timesheet.csv', 'wb') as f:
+        csv_writer = csv.writer(f)
+        for row in rows:
+            csv_writer.writerow(row)
+
     # Resets the time for the week
     c.execute('''UPDATE users SET timeLateThisWeek=0.0, clockedIn=0, timeSpentThisWeek=0.0''')
     slack_client.api_call("chat.postMessage", channel=command['channel'], 
@@ -467,9 +473,6 @@ def parse_slack_output(slack_rtm_output):
     directed at the Bot, based on its ID.
     """
     output_list = slack_rtm_output
-    if output_list:
-        print(datetime.datetime.now(), end='')
-        print(output_list)
     if output_list and len(output_list) > 0:
         for output in output_list:
             if output and 'text' in output and output['text'].startswith('!') and output['user'] != BOT_ID:
@@ -481,7 +484,9 @@ def parse_slack_output(slack_rtm_output):
 
 
 if __name__ == "__main__":
-    READ_WEBSOCKET_DELAY = 1 # 1 second delay between reading from firehose
+    READ_WEBSOCKET_DELAY = .3 # .3 second delay between reading from firehose
+
+    # If the database doesn't exist, you rebuild it
     if not os.path.isfile("team.db"):
         initialize_db()
 
@@ -489,17 +494,18 @@ if __name__ == "__main__":
     conn = sqlite3.connect('team.db')
     c = conn.cursor()
 
-
-
     if slack_client.rtm_connect():
         print("TimeBot connected and running!")
         try:
             while True:
                 try:
                     command = parse_slack_output(slack_client.rtm_read())
+                # Sometimes the socket closes
                 except (TimeoutError, websocket._exceptions.WebSocketConnectionClosedException) as e:
+                    # We write what time it happened and what happened
                     with open('crash.log', 'a+') as f:
                         f.write(str(datetime.datetime.now()) + ': ' + str(type(e)) + '\n')
+                    # Then we reconnect
                     if slack_client.rtm_connect():
                         continue
                     else:
