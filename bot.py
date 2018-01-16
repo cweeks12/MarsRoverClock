@@ -524,7 +524,7 @@ if __name__ == "__main__":
                         handle_command(command)
                     except:
                         slack_client.api_call("chat.postMessage", channel=command['channel'],
-                            text="That didn't work... Talk to an administrator.", as_user=True)
+                            text="Whoa! You almost killed me! Talk to an administrator.", as_user=True)
                 if not command:
                     time.sleep(READ_WEBSOCKET_DELAY)
         except KeyboardInterrupt:
