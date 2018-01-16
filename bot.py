@@ -516,11 +516,15 @@ if __name__ == "__main__":
                         print(str(datetime.datetime.now()) + ": RECOVERED FROM A CRASH")
                         continue
                     else:
-                        print(str(datetime.datetime.now()) + "Slack client failed to reconnect")
+                        print(str(datetime.datetime.now()) + ": Slack client failed to reconnect")
                         conn.close()
                         break
                 if command:
-                    handle_command(command)
+                    try:
+                        handle_command(command)
+                    except:
+                        slack_client.api_call("chat.postMessage", channel=command['channel'],
+                            text="That didn't work... Talk to an administrator.", as_user=True)
                 if not command:
                     time.sleep(READ_WEBSOCKET_DELAY)
         except KeyboardInterrupt:
