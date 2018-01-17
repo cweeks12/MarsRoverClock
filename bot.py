@@ -257,8 +257,6 @@ def clock_in(command):
     timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn, timeClockedInAt, realName, checkInDate FROM users WHERE id=? AND active=1''', (command['user'],))
     row = timeLateThisWeek.fetchone()
     
-    slack_client.api_call("chat.postMessage", channel=command['channel'],
-                text=str(row[5]), as_user=True)
     if not row:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are not in the database or you're not marked active. Talk to an administrator.", as_user=True)
