@@ -254,15 +254,26 @@ def clock_in(command):
     else:
         delta = difference.total_seconds()
 
-    timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn, timeClockedInAt, realName FROM users WHERE id=? AND active=1''', (command['user'],))
+    timeLateThisWeek = c.execute('''SELECT timeLateThisWeek, totalTimeLate, clockedIn, timeClockedInAt, realName, checkInDate FROM users WHERE id=? AND active=1''', (command['user'],))
     row = timeLateThisWeek.fetchone()
     
+    slack_client.api_call("chat.postMessage", channel=command['channel'],
+                text=str(row[5]), as_user=True)
     if not row:
         slack_client.api_call("chat.postMessage", channel=command['channel'],
                 text="You are not in the database or you're not marked active. Talk to an administrator.", as_user=True)
         return
+
+    elif row[5] == datetime.date.today().toordinal():
+        c.execute('''UPDATE users SET timeClockedInAt=?, clockedIn=1 WHERE id=?''', 
+                                        (datetime.datetime.now().timestamp(),
+                                        command['user'],))
+
+        slack_client.api_call("reactions.add", channel=command['channel'], 
+            name='thumbsup', timestamp=command['ts'])
+        print(str(datetime.datetime.now()) + ": " + str(row[4]) + ' clocked in again')
     
-    if row[2] != 1:
+    elif row[2] != 1:
         c.execute('''UPDATE users SET timeLateThisWeek=?, totalTimeLate=?, timeClockedInAt=?, checkInDate=?, clockedIn=1 WHERE id=?''', 
                                         (row[0] + delta, 
                                         row[1] + delta, 
@@ -333,7 +344,7 @@ def clock_out(command):
                 text="You are not in the database or you're not marked active. Talk to an administrator.", as_user=True)
         return
 
-    delta = datetime.datetime.now().timestamp() - row[3] # Time spent in seconds
+    delta = datetime.datetime.now().timestamp() - float(row[3]) # Time spent in seconds
     
     if row[2] != 0:
         c.execute('''UPDATE users SET timeSpentThisWeek=?, totalTimeSpent=?, clockedIn=0 WHERE id=?''', 
@@ -418,7 +429,7 @@ def get_standings(command):
 def reset(command):
     rows = c.execute('''SELECT realName, timeLateThisWeek, timeSpentThisWeek FROM users WHERE active=1''')
     # Write the current status to a csv
-    with open(str(datetime.date.today) + '-timesheet.csv', 'w') as f:
+    with open(str(datetime.date.today()) + '-timesheet.csv', 'w') as f:
         csv_writer = csv.writer(f)
         for row in rows:
             csv_writer.writerow(row)
