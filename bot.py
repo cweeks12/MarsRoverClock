@@ -476,6 +476,8 @@ def status(command):
     else:
         text = "You have not been late yet this week."
 
+    text += " "
+
     if response[2] > 0:
         text += "You have worked for " + toTime(response[2]) + " this week. "
     else:
