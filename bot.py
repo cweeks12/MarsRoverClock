@@ -429,11 +429,12 @@ def reset(command):
     # Write the current status to a csv
     with open(str(datetime.date.today()) + '-timesheet.csv', 'w') as f:
         csv_writer = csv.writer(f)
+        csv_writer.writerow([i[0] for i in c.description])
         for row in rows:
             csv_writer.writerow(row)
 
     # Resets the time for the week
-    c.execute('''UPDATE users SET timeLateThisWeek=0.0, timeSpentThisWeek=0.0''')
+    c.execute('''UPDATE users SET timeLateThisWeek=0.0, clockedIn=0, timeSpentThisWeek=0.0''')
     slack_client.api_call("chat.postMessage", channel=command['channel'], 
             text="Standings reset!", as_user=True)
     with open('reset.log', 'a+') as f:
@@ -535,7 +536,7 @@ if __name__ == "__main__":
                         handle_command(command)
                     except:
                         slack_client.api_call("chat.postMessage", channel=command['channel'],
-                            text="Whoa! You almost killed me! Talk to an administrator.", as_user=True)
+                            text="Whoa! You almost killed me! Try doing *!active*. If that doesn't work, talk to an administrator.", as_user=True)
                 if not command:
                     time.sleep(READ_WEBSOCKET_DELAY)
         except KeyboardInterrupt:
