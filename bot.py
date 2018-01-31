@@ -431,7 +431,7 @@ def reset(command):
         csv_writer = csv.writer(f)
         csv_writer.writerow([i[0] for i in c.description])
         for row in rows:
-            csv_writer.writerow([row[0], toTime(row[1]), toTime(row[2]))
+            csv_writer.writerow([row[0], toTime(row[1]), toTime(row[2])])
 
     # Resets the time for the week
     c.execute('''UPDATE users SET timeLateThisWeek=0.0, clockedIn=0, timeSpentThisWeek=0.0''')
