@@ -138,6 +138,7 @@ def handle_command(command):
     elif command['text'].startswith('!report') and command['channel'] == leader_channel_id:
         print("i made it")
         report(command)
+
     
     elif command['text'].startswith('!lateweek'):
         rows = c.execute('''SELECT timeLateThisWeek FROM users WHERE active=1''')
