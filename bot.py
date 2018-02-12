@@ -107,7 +107,7 @@ def handle_command(command):
         clock_in(command)
 
     # Reset the week
-    elif command['text'].startswith('!!reset') and command['channel'][0] == leader_channel_id:
+    elif command['text'].startswith('!!reset') and command['channel'][0] == 'D':
         reset(command)
 
     # Mark as active
@@ -135,7 +135,7 @@ def handle_command(command):
     elif command['text'].startswith('!standings'):
         get_standings(command)
 
-    elif command['text'].startswith('!report') and command['channel'] == leader_channel_id:
+    elif command['text'].startswith('!report') and command['channel'][0] == 'D':
         print("i made it")
         report(command)
     
@@ -436,8 +436,6 @@ def report(command):
         csv_writer.writerow([i[0] for i in c.description])
         for row in rows:
             csv_writer.writerow([row[0], toTime(row[1]), toTime(row[2])])
-    slack_client.api_call("chat.postMessage", channel=command['channel'], 
-            text="I'm working on it", as_user=True)
 
     # Make it send to the leader channel
     slack_client.api_call('files.upload', as_user=True, channels=command['channel'], filename=str(datetime.date.today()) + '-timesheet.csv', file=open(str(datetime.date.today()) + '-timesheet.csv', 'rb'))
@@ -529,7 +527,6 @@ if __name__ == "__main__":
         for channel in slack_client.api_call("channels.list")['channels']:
             if channel['name'] == leader_channel:
                 leader_channel_id = channel['id']
-                print(leader_channel_id + channel['name'])
                 break
         if leader_channel_id is None:
             print("I didn't find the leaders' channel :(")
