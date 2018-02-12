@@ -14,7 +14,9 @@ from slackclient import SlackClient
 # timebot's ID as an environment variable
 BOT_ID = os.environ.get("BOT_ID")
 
-
+# Channel to put the csv into
+leader_channel = "timebottest"
+leader_channel_id = None
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 
@@ -75,17 +77,19 @@ def getStartingTime():
 
     # Weekday besides Wednesday
     if today.weekday() in [0, 1, 3, 4]:
-        return 8
+        hourToBegin = 8
+        minuteToBegin = 0
     # Wednesday
     elif today.weekday() == 2:
-        return 7
+        hourToBegin = 7
+        minuteToBegin = 30
     # Weekend
     else:
         slack_client.api_call("chat.postMessage", channel=command['channel'], 
                 text="Why are you coming in on the weekend???", as_user = True)
-        return 8
+        return datetime.datetime.now()
 
-
+    return datetime.datetime(today.year, today.month, today.day, hour=timeToBegin, minute=minuteToBegin)
 
 def handle_command(command):
     """
@@ -103,7 +107,7 @@ def handle_command(command):
         clock_in(command)
 
     # Reset the week
-    elif command['text'].startswith('!!reset') and command['channel'][0] == 'D':
+    elif command['text'].startswith('!!reset') and command['channel'][0] == leader_channel_id:
         reset(command)
 
     # Mark as active
@@ -130,6 +134,10 @@ def handle_command(command):
     # Show current standings. Latest and time spent
     elif command['text'].startswith('!standings'):
         get_standings(command)
+
+    elif command['text'].startswith('!report') and command['channel'] == leader_channel_id:
+        print("i made it")
+        report(command)
     
     elif command['text'].startswith('!lateweek'):
         rows = c.execute('''SELECT timeLateThisWeek FROM users WHERE active=1''')
@@ -240,12 +248,8 @@ def clock_in(command):
         return
         
 
-    timeToBegin = getStartingTime()
-
-    today = datetime.datetime.today()
-
     # There's an issue here, but I don't know what it is.
-    startTime = datetime.datetime(today.year, today.month, today.day, hour=timeToBegin)
+    startTime = getStartingTime()
     difference = datetime.datetime.now() - startTime
 
     if difference.total_seconds() < 0:
@@ -314,8 +318,8 @@ def in_late(command):
         c.execute('''UPDATE users SET timeLateThisWeek=?, totalTimeLate=?, timeClockedInAt=?, checkInDate=?, clockedIn=1 WHERE id=?''', 
                                         (row[0] + secondsLate, 
                                         row[1] + secondsLate, 
-                                        datetime.datetime(today.year, today.month, today.day, hour=getStartingTime() + secondsLate // 3600,
-                                                            minute=(secondsLate % 3600) // 60,
+                                        datetime.datetime(today.year, today.month, today.day, hour=getStartingTime().hour + secondsLate // 3600,
+                                                            minute=getStartingTime().minute + (secondsLate % 3600) // 60,
                                                             second=secondsLate % 3600 % 60).timestamp(),
                                         datetime.date.today().toordinal(), 
                                         command['user'],))
@@ -424,7 +428,7 @@ def get_standings(command):
     slack_client.api_call("chat.postMessage", channel=command["channel"], as_user=True,
             text=text, linkNames=False)
 
-def reset(command):
+def report(command):
     rows = c.execute('''SELECT realName, timeLateThisWeek, timeSpentThisWeek FROM users WHERE active=1''')
     # Write the current status to a csv
     with open(str(datetime.date.today()) + '-timesheet.csv', 'w') as f:
@@ -432,6 +436,14 @@ def reset(command):
         csv_writer.writerow([i[0] for i in c.description])
         for row in rows:
             csv_writer.writerow([row[0], toTime(row[1]), toTime(row[2])])
+    slack_client.api_call("chat.postMessage", channel=command['channel'], 
+            text="I'm working on it", as_user=True)
+
+    # Make it send to the leader channel
+    slack_client.api_call('files.upload', as_user=True, channels=command['channel'], filename=str(datetime.date.today()) + '-timesheet.csv', file=open(str(datetime.date.today()) + '-timesheet.csv', 'rb'))
+
+def reset(command):
+    report(command)
 
     # Resets the time for the week
     c.execute('''UPDATE users SET timeLateThisWeek=0.0, clockedIn=0, timeSpentThisWeek=0.0''')
@@ -514,6 +526,14 @@ if __name__ == "__main__":
 
     if slack_client.rtm_connect():
         print("TimeBot connected and running!")
+        for channel in slack_client.api_call("channels.list")['channels']:
+            if channel['name'] == leader_channel:
+                leader_channel_id = channel['id']
+                print(leader_channel_id + channel['name'])
+                break
+        if leader_channel_id is None:
+            print("I didn't find the leaders' channel :(")
+
         try:
             while True:
                 try:
