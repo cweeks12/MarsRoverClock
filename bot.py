@@ -89,7 +89,7 @@ def getStartingTime():
                 text="Why are you coming in on the weekend???", as_user = True)
         return datetime.datetime.now()
 
-    return datetime.datetime(today.year, today.month, today.day, hour=timeToBegin, minute=minuteToBegin)
+    return datetime.datetime(today.year, today.month, today.day, hour=hourToBegin, minute=minuteToBegin)
 
 def handle_command(command):
     """
@@ -554,9 +554,10 @@ if __name__ == "__main__":
                 if command:
                     try:
                         handle_command(command)
-                    except:
+                    except Exception as e:
                         slack_client.api_call("chat.postMessage", channel=command['channel'],
                             text="Whoa! You almost killed me! Try doing *!active*. If that doesn't work, talk to an administrator.", as_user=True)
+                        print(str(e))
                 if not command:
                     time.sleep(READ_WEBSOCKET_DELAY)
         except KeyboardInterrupt:
