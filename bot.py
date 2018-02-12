@@ -524,7 +524,7 @@ if __name__ == "__main__":
 
     if slack_client.rtm_connect():
         print("TimeBot connected and running!")
-        for channel in slack_client.api_call("groups.list")['channels']:
+        for channel in slack_client.api_call("groups.list")['groups']:
             if channel['name'] == leader_channel:
                 leader_channel_id = channel['id']
                 break
