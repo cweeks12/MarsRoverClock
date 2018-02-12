@@ -135,7 +135,7 @@ def handle_command(command):
     elif command['text'].startswith('!standings'):
         get_standings(command)
 
-    elif command['text'].startswith('!report') and command['channel'][0] == 'D':        print("i made it")
+    elif command['text'].startswith('!report') and command['channel'][0] == 'D':        
         report(command)
 
     
