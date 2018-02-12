@@ -15,7 +15,7 @@ from slackclient import SlackClient
 BOT_ID = os.environ.get("BOT_ID")
 
 # Channel to put the csv into
-leader_channel = "timebottest"
+leader_channel = "subteamleads"
 leader_channel_id = None
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
